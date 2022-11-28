@@ -155,4 +155,20 @@ cache
 data
 figures/*.pdf
 
+model_zoo
+*.png
+thirdparty
+reconstructions/euroc/disps.npy
+reconstructions/euroc/est_file.txt
+reconstructions/euroc/images.npy
+reconstructions/euroc/intrinsics.npy
+reconstructions/euroc/poses.npy
+reconstructions/euroc/tstamps.npy
+reconstructions/sfm/disps.npy
+reconstructions/sfm/est_file.txt
+reconstructions/sfm/images.npy
+reconstructions/sfm/intrinsics.npy
+reconstructions/sfm/poses.npy
+reconstructions/sfm/tstamps.npy
+
 
