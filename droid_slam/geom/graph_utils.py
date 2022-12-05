@@ -45,20 +45,20 @@ def build_frame_graph(poses, disps, intrinsics, num=16, thresh=24.0, r=2):
     count = 0
     graph = OrderedDict()
     
-    for i in range(N):
+    for i in range(N):  # number of frame: 7
         graph[i] = []
         d[i,i] = np.inf
         for j in range(i-r, i+r+1):
-            if 0 <= j < N and i != j:
+            if 0 <= j < N and i != j:  # 对相邻的5个结果赋值0
                 graph[i].append(j)
                 d[i,j] = np.inf
                 count += 1
 
-    while count < num:
+    while count < num:    # 总共只能拿24个
         ix = np.argmin(d)
-        i, j = ix // N, ix % N
+        i, j = ix // N, ix % N  # 获取最小值的位置
 
-        if d[i,j] < thresh:
+        if d[i,j] < thresh:   # 如果最小值也小于阈值，那么也加入图中
             graph[i].append(j)
             d[i,j] = np.inf
             count += 1

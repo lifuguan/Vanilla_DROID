@@ -19,19 +19,22 @@ class CorrSampler(torch.autograd.Function):
         grad_volume, = droid_backends.corr_index_backward(volume, coords, grad_output, ctx.radius)
         return grad_volume, None, None
 
-
+"""
+从RAFT处继承 https://github.com/princeton-vl/RAFT/blob/master/core/corr.py
+"""
 class CorrBlock:
     def __init__(self, fmap1, fmap2, num_levels=4, radius=3):
         self.num_levels = num_levels
         self.radius = radius
         self.corr_pyramid = []
 
-        # all pairs correlation
+        # ii和jj构成共视帧的配对，并求取相关性矩阵
         corr = CorrBlock.corr(fmap1, fmap2)
 
         batch, num, h1, w1, h2, w2 = corr.shape
         corr = corr.reshape(batch*num*h1*w1, 1, h2, w2)
         
+        # 降采样构建金字塔结构
         for i in range(self.num_levels):
             self.corr_pyramid.append(
                 corr.view(batch*num, h1, w1, h2//2**i, w2//2**i))
@@ -64,10 +67,12 @@ class CorrBlock:
     def corr(fmap1, fmap2):
         """ all-pairs correlation """
         batch, num, dim, ht, wd = fmap1.shape
+        # (22,128,3072)
         fmap1 = fmap1.reshape(batch*num, dim, ht*wd) / 4.0
         fmap2 = fmap2.reshape(batch*num, dim, ht*wd) / 4.0
-        
-        corr = torch.matmul(fmap1.transpose(1,2), fmap2)
+        # (22,3072,3072)
+        corr = torch.matmul(fmap1.transpose(1,2), fmap2)  # 22对相似图相乘
+        # (1,22,48,64,48,64)
         return corr.view(batch, num, ht, wd, ht, wd)
 
 

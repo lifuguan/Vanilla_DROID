@@ -96,13 +96,15 @@ def actp(Gij, X0, jacobian=False):
 def projective_transform(poses, depths, intrinsics, ii, jj, jacobian=False, return_depth=False):
     """ map points from ii->jj """
 
-    # inverse project (pinhole)
+    # inverse project (pinhole) pixel coord(u, v) -> film coord(x,y,1,depth)
     X0, Jz = iproj(depths[:,ii], intrinsics[:,ii], jacobian=jacobian)
     
-    # transform
-    Gij = poses[:,jj] * poses[:,ii].inv()
+    # transform  从ii到jj的变换矩阵
+    Gij = poses[:,jj] * poses[:,ii].inv()  
 
+    # ii=jj的话，直接赋予默认变换矩阵
     Gij.data[:,ii==jj] = torch.as_tensor([-0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0], device="cuda")
+    # point clouds(x,y,z,1)
     X1, Ja = actp(Gij, X0, jacobian=jacobian)
     
     # project (pinhole)

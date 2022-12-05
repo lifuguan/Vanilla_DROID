@@ -59,7 +59,7 @@ class Droid:
         self.net.to("cuda:0").eval()
 
     def track(self, tstamp, image, depth=None, intrinsics=None):
-        """ main thread - update map """
+        """ main thread - update map (也是前向传播的函数)"""
 
         with torch.no_grad():
             # check there is enough motion

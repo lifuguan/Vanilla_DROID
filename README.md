@@ -1,5 +1,14 @@
- python demo.py --imagedir=data/sfm_bench/rgb --calib=calib/eth.txt --disable_vis --reconstruction_path ./
+## 下载数据集
+1. 安装azcopy
+2. 下载
+```shell
+python download_training.py --rgb --depth --only-left --output-dir ~/slam_data/TartanAir/ --azcopy
+```
 
+## DEMO: sfm
+```shell 
+ python demo.py --imagedir=data/sfm_bench/rgb --calib=calib/eth.txt --disable_vis --reconstruction_path ./
+```
 
 
 ## DEMO: EUROC

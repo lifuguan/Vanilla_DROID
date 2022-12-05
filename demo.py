@@ -12,7 +12,7 @@ import time
 import argparse
 
 from torch.multiprocessing import Process
-from droid import Droid
+from droid_slam.droid import Droid
 
 import torch.nn.functional as F
 

@@ -8,16 +8,16 @@ from collections import OrderedDict
 import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
-from data_readers.factory import dataset_factory
+from droid_slam.data_readers.factory import dataset_factory
 
 from lietorch import SO3, SE3, Sim3
-from geom import losses
-from geom.losses import geodesic_loss, residual_loss, flow_loss
-from geom.graph_utils import build_frame_graph
+from droid_slam.geom import losses
+from droid_slam.geom.losses import geodesic_loss, residual_loss, flow_loss
+from droid_slam.geom.graph_utils import build_frame_graph
 
 # network
-from droid_net import DroidNet
-from logger import Logger
+from droid_slam.droid_net import DroidNet
+from droid_slam.logger import Logger
 
 # DDP training
 import torch.multiprocessing as mp
@@ -34,11 +34,6 @@ def setup_ddp(gpu, args):
 
     torch.manual_seed(0)
     torch.cuda.set_device(gpu)
-
-def show_image(image):
-    image = image.permute(1, 2, 0).cpu().numpy()
-    cv2.imshow('image', image / 255.0)
-    cv2.waitKey()
 
 def train(gpu, args):
     """ Test to make sure project transform correctly maps points """
@@ -78,13 +73,15 @@ def train(gpu, args):
         for i_batch, item in enumerate(train_loader):
             optimizer.zero_grad()
 
+            # 7 frames per batch
             images, poses, disps, intrinsics = [x.to('cuda') for x in item]
-
+            
             # convert poses w2c -> c2w
             Ps = SE3(poses).inv()
             Gs = SE3.IdentityLike(Ps)
-
+            
             # randomize frame graph
+            # TODO : 这一步不知道为啥要随机化
             if np.random.rand() < 0.5:
                 graph = build_frame_graph(poses, disps, intrinsics, num=args.edges)
             
@@ -96,7 +93,7 @@ def train(gpu, args):
             # fix first to camera poses
             Gs.data[:,0] = Ps.data[:,0].clone()
             Gs.data[:,1:] = Ps.data[:,[1]].clone()
-            disp0 = torch.ones_like(disps[:,:,3::8,3::8])
+            disp0 = torch.ones_like(disps[:,:,3::8,3::8])  # 8倍降采样（同步采样后的特征图）
 
             # perform random restarts
             r = 0
@@ -104,8 +101,15 @@ def train(gpu, args):
                 r = rng.random()
                 
                 intrinsics0 = intrinsics / 8.0
-                poses_est, disps_est, residuals = model(Gs, images, disp0, intrinsics0, 
-                    graph, num_steps=args.iters, fixedp=2)
+                poses_est, disps_est, residuals = model(
+                    Gs, 
+                    images, 
+                    disp0, 
+                    intrinsics0, 
+                    graph, 
+                    num_steps=args.iters, 
+                    fixedp=2
+                )
 
                 geo_loss, geo_metrics = losses.geodesic_loss(Ps, poses_est, graph, do_scale=False)
                 res_loss, res_metrics = losses.residual_loss(residuals)

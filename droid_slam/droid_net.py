@@ -160,8 +160,8 @@ class DroidNet(nn.Module):
         std = torch.as_tensor([0.229, 0.224, 0.225], device=images.device)
         images = images.sub_(mean[:, None, None]).div_(std[:, None, None])
 
-        fmaps = self.fnet(images)
-        net = self.cnet(images)
+        fmaps = self.fnet(images)    # feature network  (1,128,48,64)
+        net = self.cnet(images)   # context network     (1,256,48,64)
         
         net, inp = net.split([128,128], dim=2)
         net = torch.tanh(net)
@@ -170,36 +170,43 @@ class DroidNet(nn.Module):
 
 
     def forward(self, Gs, images, disps, intrinsics, graph=None, num_steps=12, fixedp=2):
-        """ Estimates SE3 or Sim3 between pair of frames """
+        """ Estimates SE3 or Sim3 between pair of frames 
+        @Gs    : pose (ground truth)
+        @images: input images (monocular)
+        @disps : depth images (ground truth)
+        @graph : 
+        """
 
-        u = keyframe_indicies(graph)
+        # ii和jj共同构成共视帧的配对
         ii, jj, kk = graph_to_edge_list(graph)
-
-        ii = ii.to(device=images.device, dtype=torch.long)
+        ii = ii.to(device=images.device, dtype=torch.long)  
         jj = jj.to(device=images.device, dtype=torch.long)
 
+        # 1,7,128,48,64
         fmaps, net, inp = self.extract_features(images)
         net, inp = net[:,ii], inp[:,ii]
-        corr_fn = CorrBlock(fmaps[:,ii], fmaps[:,jj], num_levels=4, radius=3)
+
+        """Corrlation Pyramid"""
+        corr_fn = CorrBlock(fmaps[:,ii], fmaps[:,jj], num_levels=4, radius=3) # ii和jj刚好可以对应为co-visibility frame的配对
 
         ht, wd = images.shape[-2:]
-        coords0 = pops.coords_grid(ht//8, wd//8, device=images.device)
+        coords0 = pops.coords_grid(ht//8, wd//8, device=images.device) # 初始化坐标 ht*wd个[x,y]
         
-        coords1, _ = pops.projective_transform(Gs, disps, intrinsics, ii, jj)
+        coords1, _ = pops.projective_transform(Gs, disps, intrinsics, ii, jj) # 
         target = coords1.clone()
-
+        
         Gs_list, disp_list, residual_list = [], [], []
         for step in range(num_steps):
             Gs = Gs.detach()
-            disps = disps.detach()
-            coords1 = coords1.detach()
-            target = target.detach()
+            disps = disps.detach()  # depth images
+            coords1 = coords1.detach()  # 变换后的jj的相机坐标系
+            target = target.detach()  # 变换后的jj的相机坐标系
 
             # extract motion features
-            corr = corr_fn(coords1)
-            resd = target - coords1
-            flow = coords1 - coords0
-
+            corr = corr_fn(coords1)   # 24,49*4,48,64
+            resd = target - coords1   # 
+            flow = coords1 - coords0  # 光流结果
+ 
             motion = torch.cat([flow, resd], dim=-1)
             motion = motion.permute(0,1,4,2,3).clamp(-64.0, 64.0)
 
