@@ -29,7 +29,13 @@ def pose_retr(poses, dx, ii):
 
 
 def BA(target, weight, eta, poses, disps, intrinsics, ii, jj, fixedp=1, rig=1):
-    """ Full Bundle Adjustment """
+    """ Full Bundle Adjustment 利用光流进行重投影而不是特征图
+    @target: 修正后的光流
+    @weight: 置信度图
+    @eta   : 
+    @poses : 位姿
+    @disps : 深度
+    """
 
     B, P, ht, wd = disps.shape
     N = ii.shape[0]

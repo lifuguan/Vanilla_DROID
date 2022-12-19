@@ -93,9 +93,9 @@ def train(gpu, args):
             # fix first to camera poses
             Gs.data[:,0] = Ps.data[:,0].clone()
             Gs.data[:,1:] = Ps.data[:,[1]].clone()
-            disp0 = torch.ones_like(disps[:,:,3::8,3::8])  # 8倍降采样（同步采样后的特征图）
+            disp0 = torch.ones_like(disps[:,:,3::8,3::8])  # 8倍降采样（同步采样后的特征图）同时赋值为1
 
-            # perform random restarts
+            # perform random restarts: 有0.2的概率重新计算
             r = 0
             while r < args.restart_prob:
                 r = rng.random()

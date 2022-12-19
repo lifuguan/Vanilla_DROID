@@ -44,10 +44,10 @@ class CorrBlock:
         out_pyramid = []
         batch, num, ht, wd, _ = coords.shape
         coords = coords.permute(0,1,4,2,3)
-        coords = coords.contiguous().view(batch*num, 2, ht, wd)
+        coords = coords.contiguous().view(batch*num, 2, ht, wd) # 24,2,48,64 和correlation_kernels.cu里的相匹配
         
         for i in range(self.num_levels):
-            corr = CorrSampler.apply(self.corr_pyramid[i], coords/2**i, self.radius)
+            corr = CorrSampler.apply(self.corr_pyramid[i], coords/2**i, self.radius) # /2**i 为了满足金字塔缩放
             out_pyramid.append(corr.view(batch, num, -1, ht, wd))
 
         return torch.cat(out_pyramid, dim=2)

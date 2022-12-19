@@ -60,7 +60,7 @@ class GraphAgg(nn.Module):
         batch, num, ch, ht, wd = net.shape
         net = net.view(batch*num, ch, ht, wd)
 
-        _, ix = torch.unique(ii, return_inverse=True)
+        _, ix = torch.unique(ii, return_inverse=True)  # 找出i的图像
         net = self.relu(self.conv1(net))
 
         net = net.view(batch, num, 128, ht, wd)
@@ -69,10 +69,10 @@ class GraphAgg(nn.Module):
 
         net = self.relu(self.conv2(net))
 
-        eta = self.eta(net).view(batch, -1, ht, wd)
+        eta = self.eta(net).view(batch, -1, ht, wd) # pixel-wise damping factor
         upmask = self.upmask(net).view(batch, -1, 8*8*9, ht, wd)
 
-        return .01 * eta, upmask
+        return .01 * eta, upmask # 7,576,48.64
 
 
 class UpdateModule(nn.Module):
@@ -95,14 +95,14 @@ class UpdateModule(nn.Module):
         self.weight = nn.Sequential(
             nn.Conv2d(128, 128, 3, padding=1),
             nn.ReLU(inplace=True),
-            nn.Conv2d(128, 2, 3, padding=1),
+            nn.Conv2d(128, 3, 3, padding=1),
             GradientClip(),
             nn.Sigmoid())
 
         self.delta = nn.Sequential(
             nn.Conv2d(128, 128, 3, padding=1),
             nn.ReLU(inplace=True),
-            nn.Conv2d(128, 2, 3, padding=1),
+            nn.Conv2d(128, 3, 3, padding=1),
             GradientClip())
 
         self.gru = ConvGRU(128, 128+128+64)
@@ -122,13 +122,13 @@ class UpdateModule(nn.Module):
         corr = corr.view(batch*num, -1, ht, wd)
         flow = flow.view(batch*num, -1, ht, wd)
 
-        corr = self.corr_encoder(corr)
-        flow = self.flow_encoder(flow)
-        net = self.gru(net, inp, corr, flow)
+        corr = self.corr_encoder(corr) # 两层卷积 1*1 3*3
+        flow = self.flow_encoder(flow) # 两层卷积 7*7 3*3
+        net = self.gru(net, inp, corr, flow)   # net就是h_t
 
         ### update variables ###
-        delta = self.delta(net).view(*output_dim)
-        weight = self.weight(net).view(*output_dim)
+        delta = self.delta(net).view(*output_dim)   # revision flow field (H,W,2)
+        weight = self.weight(net).view(*output_dim) # confidence map  (H,W,2)
 
         delta = delta.permute(0,1,3,4,2)[...,:2].contiguous()
         weight = weight.permute(0,1,3,4,2)[...,:2].contiguous()
@@ -137,7 +137,7 @@ class UpdateModule(nn.Module):
 
         if ii is not None:
             eta, upmask = self.agg(net, ii.to(net.device))
-            return net, delta, weight, eta, upmask
+            return net, delta, weight, eta, upmask  # eta: damping factor; upmask: 用于上采样
 
         else:
             return net, delta, weight
@@ -190,7 +190,7 @@ class DroidNet(nn.Module):
         corr_fn = CorrBlock(fmaps[:,ii], fmaps[:,jj], num_levels=4, radius=3) # ii和jj刚好可以对应为co-visibility frame的配对
 
         ht, wd = images.shape[-2:]
-        coords0 = pops.coords_grid(ht//8, wd//8, device=images.device) # 初始化坐标 ht*wd个[x,y]
+        coords0 = pops.coords_grid(ht//8, wd//8, device=images.device) # 默认像素坐标系 ht*wd个[x,y]
         
         coords1, _ = pops.projective_transform(Gs, disps, intrinsics, ii, jj) # 
         target = coords1.clone()
@@ -203,17 +203,23 @@ class DroidNet(nn.Module):
             target = target.detach()  # 变换后的jj的相机坐标系
 
             # extract motion features
-            corr = corr_fn(coords1)   # 24,49*4,48,64
+            corr = corr_fn(coords1)   # 24,49*4,48,64   jj为视角的金字塔特征
             resd = target - coords1   # 
-            flow = coords1 - coords0  # 光流结果
- 
+            flow = coords1 - coords0  # 光流结果，论文中的f1,f2
+
             motion = torch.cat([flow, resd], dim=-1)
-            motion = motion.permute(0,1,4,2,3).clamp(-64.0, 64.0)
+            motion = motion.permute(0,1,4,2,3).clamp(-64.0, 64.0) # 设置上下限
 
-            net, delta, weight, eta, upmask = \
-                self.update(net, inp, corr, motion, ii, jj)
+            net, delta, weight, eta, upmask = self.update(
+                    net,      # tanh(context)   i图的语义特征图 作为初始隐藏状态
+                    inp,      # relu(context)   i图的语义特征图
+                    corr,     # C_ij j视角下的相关特征图
+                    motion,   # 光流+residual
+                    ii, 
+                    jj
+                ) 
 
-            target = coords1 + delta
+            target = coords1 + delta   # p*_ij = p_ij + r_ij
 
             for i in range(2):
                 Gs, disps = BA(target, weight, eta, Gs, disps, intrinsics, ii, jj, fixedp=2)

@@ -37,6 +37,7 @@ __global__ void corr_index_forward_kernel(
     return;
   }
 
+  // 获得x'的坐标值
   float x0 = coords[n][0][y][x];
   float y0 = coords[n][1][y][x];
 
@@ -44,12 +45,15 @@ __global__ void corr_index_forward_kernel(
   float dy = y0 - floor(y0);
 
   int rd = 2*r + 1;
-  for (int i=0; i<rd+1; i++) {
-    for (int j=0; j<rd+1; j++) {
+  for (int i=0; i<rd+1; i++) 
+  {
+    for (int j=0; j<rd+1; j++) 
+    {
       int x1 = static_cast<int>(floor(x0)) - r + i;
       int y1 = static_cast<int>(floor(y0)) - r + j;
 
-      if (within_bounds(y1, x1, h2, w2)) {
+      if (within_bounds(y1, x1, h2, w2)) 
+      {
         scalar_t s = volume[n][y][x][y1][x1];
 
         if (i > 0 && j > 0)
@@ -139,7 +143,7 @@ std::vector<torch::Tensor> corr_index_cuda_forward(
   const dim3 threads(BLOCK, BLOCK);
 
   auto opts = volume.options();
-  torch::Tensor corr = torch::zeros(
+  torch::Tensor corr = torch::zeros(  // 新建相关矩阵
     {batch_size, 2*radius+1, 2*radius+1, ht, wd}, opts);
 
   AT_DISPATCH_FLOATING_TYPES_AND_HALF(volume.type(), "sampler_forward_kernel", ([&] {
