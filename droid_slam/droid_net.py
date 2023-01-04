@@ -95,14 +95,14 @@ class UpdateModule(nn.Module):
         self.weight = nn.Sequential(
             nn.Conv2d(128, 128, 3, padding=1),
             nn.ReLU(inplace=True),
-            nn.Conv2d(128, 3, 3, padding=1),
+            nn.Conv2d(128, 2, 3, padding=1),
             GradientClip(),
             nn.Sigmoid())
-
+            
         self.delta = nn.Sequential(
             nn.Conv2d(128, 128, 3, padding=1),
             nn.ReLU(inplace=True),
-            nn.Conv2d(128, 3, 3, padding=1),
+            nn.Conv2d(128, 2, 3, padding=1),
             GradientClip())
 
         self.gru = ConvGRU(128, 128+128+64)

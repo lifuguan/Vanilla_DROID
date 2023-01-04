@@ -53,7 +53,8 @@ def train(gpu, args):
         model.load_state_dict(torch.load(args.ckpt))
 
     # fetch dataloader
-    db = dataset_factory(['tartan'], datapath=args.datapath, n_frames=args.n_frames, fmin=args.fmin, fmax=args.fmax)
+
+    db = dataset_factory([args.dataset], datapath=args.datapath, n_frames=args.n_frames, fmin=args.fmin, fmax=args.fmax)
 
     train_sampler = torch.utils.data.distributed.DistributedSampler(
         db, shuffle=True, num_replicas=args.world_size, rank=gpu)
@@ -65,7 +66,7 @@ def train(gpu, args):
     scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, 
         args.lr, args.steps, pct_start=0.01, cycle_momentum=False)
 
-    logger = Logger(args.name, scheduler)
+    logger = Logger(args, scheduler)
     should_keep_training = True
     total_steps = 0
 
@@ -150,14 +151,15 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--name', default='bla', help='name your experiment')
+    parser.add_argument('--dataset', default='Tartan', help='name your experiment')
     parser.add_argument('--ckpt', help='checkpoint to restore')
     parser.add_argument('--datasets', nargs='+', help='lists of datasets for training')
     parser.add_argument('--datapath', default='datasets/TartanAir', help="path to dataset directory")
-    parser.add_argument('--gpus', type=int, default=4)
+    parser.add_argument('--gpus', type=int, default=8)
 
     parser.add_argument('--batch', type=int, default=1)
     parser.add_argument('--iters', type=int, default=15)
-    parser.add_argument('--steps', type=int, default=250000)
+    parser.add_argument('--steps', type=int, default=20000)
     parser.add_argument('--lr', type=float, default=0.00025)
     parser.add_argument('--clip', type=float, default=2.5)
     parser.add_argument('--n_frames', type=int, default=7)
@@ -176,14 +178,19 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     args.world_size = args.gpus
-    print(args)
+
 
     import os
     if not os.path.isdir('checkpoints'):
         os.mkdir('checkpoints')
 
     args = parser.parse_args()
+    if args.dataset == "tartan":
+        args.datapath = "~/slam_data/TartanAir"
+    elif args.dataset == "vkitti2":
+        args.datapath = "/home/hao/slam_data/vkitti2"
     args.world_size = args.gpus
+    print(args)
 
     os.environ['MASTER_ADDR'] = 'localhost'
     os.environ['MASTER_PORT'] = '12356'
